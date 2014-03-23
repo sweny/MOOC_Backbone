@@ -56,9 +56,6 @@ public class InboundMgmtWorker extends Thread {
 	int workerId;
 	boolean forever = true;
 
-	//Start Sweny New Code Date: 03/22/14
-	boolean flag = true;
-	//End Sweny New Code Date: 03/22/14
 	public InboundMgmtWorker(ThreadGroup tgrp, int workerId) {
 		super(tgrp, "inbound-mgmt-" + workerId);
 		this.workerId = workerId;
@@ -98,9 +95,8 @@ public class InboundMgmtWorker extends Thread {
 					HeartbeatManager.getInstance().processRequest(req.getBeat());
 				} else if (req.hasElection()) {
 					//Got the ElectionMessage 
-					logger.info("Got the election Message --> Forwarding it to processRequest");
+					logger.info("Got the election Message --> Forwarding it to processRequest"); //Comment by Sweny
 					ElectionManager.getInstance().processRequest(req.getElection());
-					logger.info("Got the election Message --> Message sent to processRequest");
 				} else if (req.hasGraph()) {
 					NetworkManager.getInstance().processRequest(req.getGraph(), msg.channel, msg.sa);
 				} else if (req.hasJobBid()) {

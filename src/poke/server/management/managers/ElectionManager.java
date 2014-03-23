@@ -41,6 +41,7 @@ import poke.monitor.MonitorListener;
 import poke.monitor.HeartMonitor.MonitorClosedListener;
 import poke.server.Server;
 import poke.server.conf.ServerConf;
+import poke.server.conf.ServerConf.GeneralConf;
 import poke.server.management.ManagementQueue;
 import eye.Comm.LeaderElection;
 import eye.Comm.LeaderElection.VoteAction;
@@ -57,25 +58,31 @@ import poke.server.management.ManagementQueue.ManagementQueueEntry;
 public class ElectionManager {
 	protected static Logger logger = LoggerFactory.getLogger("management");
 	protected static AtomicReference<ElectionManager> instance = new AtomicReference<ElectionManager>();
-	//Start Sweny
+	//Start New Code By Sweny Date: 03/12/2014
 	protected ServerConf conf;
 	protected String message;
 	String myId;
-	protected ChannelFuture channel;
+	String desc;
+	public static String leaderNodeId;
+	GeneratedMessage msg;
+	boolean flag = true;
+	public static boolean electionStarted = true;
+	//Commented below fields as used for creating new Channel
+	/*protected ChannelFuture channel;
 	private MonitorHandler handler;
 	private EventLoopGroup group;
 	private static int N = 0;
 	private String whoami;
 	private String host;
 	private int port;
-	private List<MonitorListener> listeners = new ArrayList<MonitorListener>();
-	//End Sweny
+	private List<MonitorListener> listeners = new ArrayList<MonitorListener>();*/
+	//End New Code By Sweny Date: 03/12/2014
 	//Atomic reference whose values are updated automatically. - Sweny
 	private String nodeId;
 
 	/** @brief the number of votes this server can cast */
 	private int votes = 1;
-
+	
 	public static ElectionManager getInstance(String id, int votes) {
 		instance.compareAndSet(null, new ElectionManager(id, votes));
 		return instance.get();
@@ -106,11 +113,11 @@ public class ElectionManager {
 
 		if (req == null )
 			return;
-		//Start New Code -By Sweny Date: 03/12/2014
+		//Start New Code to get myId -By Sweny Date: 03/12/2014
 		ElectionManager electionMgr = ElectionManager.getInstance();
-		if(conf != null){
-			myId = conf.getServer().getProperty("node.id");
-		}
+			myId  = Server.myId;
+			logger.info("myId "+myId);
+			
 		//End new Code by Sweny Date: 03/12/2014
 		if (req.hasExpires()) {
 			long ct = System.currentTimeMillis();
@@ -122,41 +129,68 @@ public class ElectionManager {
 
 		if (req.getVote().getNumber() == VoteAction.ELECTION_VALUE) {
 			// an election is declared!
-			//Start New code Sweny Date: 03/09/2014
-			if(!myId.isEmpty()){
-				//String myId = conf.getServer().getProperty("node.id");
+			//Start New code to handle the request for Election -By Sweny Date: 03/09/2014
+			if(myId.length() > 0 && !electionStarted && HeartbeatListener.gotFirstElectMesg == false){
 				//forward same id 
-				electionMgr.sendElectionMsg(req.getNodeId(), VoteAction.ELECTION );			
+				logger.info("<--Inside ElectionManager: processReq-->Starting Election in Election_Value");
+				desc = "Starting Election, message recieved from node "+myId;
+				electionMgr.sendElectionMsg(req.getNodeId(), desc, VoteAction.ELECTION );	
+				electionStarted = false;
 			}
+			
+			if (electionStarted){
+				desc = "Sending NOMINATE_VALUE "+req.getNodeId()+" from node "+myId;
+				electionMgr.sendElectionMsg(req.getNodeId(), desc, VoteAction.NOMINATE);
+			}
+			
 			//End New Code Sweny Date: 03/10/2014	
 		} else if (req.getVote().getNumber() == VoteAction.DECLAREVOID_VALUE) {
 			// no one was elected, I am dropping into standby mode`
+			//Start new code Sweny - Date: 03/08/2014
+			logger.info("<--Inside ElectionManager: processReq-->VoteAction.DECLAREVOID_VALUE");
+			//End new code Sweny - Date: 03/08/2014
 		} else if (req.getVote().getNumber() == VoteAction.DECLAREWINNER_VALUE) {
 			// some node declared themself the leader
-			//Start new code Sweny - Date: 03/08/2014
-
+			//Start new code save the leader's NodeId for reference Sweny - Date: 03/08/2014
+			leaderNodeId  = req.getNodeId();
+			logger.info("<--Inside ElectionManager: processReq-->VoteAction.DECLAREWINNER_VALUE: "+leaderNodeId);
 			//End new code Sweny - Date: 03/08/2014
 		} else if (req.getVote().getNumber() == VoteAction.ABSTAIN_VALUE) {
 			// for some reason, I decline to vote
+			//Start new code Sweny - Date: 03/08/2014
+			logger.info("<--Inside ElectionManager: processReq-->VoteAction.ABSTAIN_VALUE");
+			//End new code Sweny - Date: 03/08/2014
 		} else if (req.getVote().getNumber() == VoteAction.NOMINATE_VALUE) {
 			int comparedToMe = req.getNodeId().compareTo(nodeId);
 			if (comparedToMe == -1) {
 				// Someone else has a higher priority, forward nomination
 				// TODO forward
 				//Start new code Sweny - Date: 03/08/2014
+				logger.info("<--Inside ElectionManager: processReq-->VoteAction.NOMINATE_VALUE: comparedToMe="+comparedToMe);
 				if(!myId.isEmpty()){
-					electionMgr.sendElectionMsg(req.getNodeId(), VoteAction.ELECTION );
+					desc = "Sending NOMINATE_VALUE "+req.getNodeId()+" from node "+myId;
+					electionMgr.sendElectionMsg(req.getNodeId(), desc, VoteAction.NOMINATE);
 				}
 				//End new code Sweny - Date: 03/08/2014
 			} else if (comparedToMe == 1) {
 				// I have a higher priority, nominate myself
 				// TODO nominate myself
 				//Start New Code : Sweny Date: 03/18/2014
-				if(!myId.isEmpty()){
-					electionMgr.sendElectionMsg(myId,VoteAction.ELECTION);
+				if(myId.length() > 0 ){
+					logger.info("<--Inside ElectionManager: processReq-->VoteAction.NOMINATE_VALUE: comparedToMe="+comparedToMe);
+					desc = "Sending NOMINATE_VALUE "+myId+" from node "+myId;
+					electionMgr.sendElectionMsg(myId, desc, VoteAction.NOMINATE);
 				}
 			}else{
-				electionMgr.sendElectionMsg(req.getNodeId(), VoteAction.DECLAREWINNER);
+				logger.info("<--Inside ElectionManager: processReq-->VoteAction.NOMINATE_VALUE: comparedToMe="+comparedToMe);
+				desc = "I'm the winner "+myId;
+				if(flag){
+					electionMgr.sendElectionMsg(req.getNodeId(), desc, VoteAction.DECLAREWINNER);
+					flag = false;
+				}else{
+					logger.info("<--Inside ElectionManager: processReq-->VoteAction.NOMINATE_VALUE: Everyone notified perform leader operations");
+					//Start functionality of Leader.
+				}
 			}
 		}
 		//End New Code: Sweny Date:03/18/2014
@@ -164,73 +198,45 @@ public class ElectionManager {
 
 	//Start New Code Sweny Date:03/10/2014
 	/**
+	 * Function to generate Election message and send to the respective listening node.
 	 * @param nodeId
 	 * @param voteAction
+	 * By Sweny Date: 03/10/2014
 	 */
-	public void sendElectionMsg(String nodeId, VoteAction voteAction) {
+	public void sendElectionMsg(String nodeId, String desc, VoteAction voteAction) {
 
-		//LeaderElection.Builder leaderElect = LeaderElection.newBuilder().setNodeId(nodeId).setBallotId("BallotId").setDesc("ElectionMessage").setVote(voteAction);
+
 		try {
-			//Management.Builder req1 = Management.newBuilder().setElection(leaderElect.build());
+			logger.info("<--Inside ElectionManager:sendElectionMsg-->sending election message");
 
-			//Bootstrap b  =new Bootstrap().channel(ManagementQueueEntry);
-			//ChannelPipeline p = Channels.newChannel(out);
-			//Channel ch = connect();
-
-			logger.info("sending election message");
-
-			//Election.Builder n = Election.newBuilder();
-			//ldr.setNodeId(nodeId);
-			//Management.Builder m = Management.newBuilder();
-			//m.setGraph(ldr.build());
-			//channel.writeAndFlush(ldr.build());
-			GeneratedMessage msg = generateElectionMessage();
-			/*logger.info("-----------------before-------current channel of incoming "+HeartbeatManager.getInstance().incomingHB.values().toString());
-			Iterator itr=  HeartbeatManager.getInstance().incomingHB.values().iterator();
-			logger.info("itr ========="+itr.hasNext());
-			if(itr.hasNext())
-			{
-				//HeartbeatData h=(HeartbeatData) itr.next();
-				//logger.info("Testing         ------------"+ h.getChannel().toString());
-				logger.info("Hellooo!!!!!!    "+((HeartbeatData) itr.next()).getChannel().toString());
-				//HeartbeatData h=(HeartbeatData) itr.next();
-				//logger.info("Testing         ------------"+ h.getChannel().toString());
-				Map.Entry pairs=(Map.Entry)itr.next();
-                Channel ch=(Channel) pairs.getKey();
-                HeartbeatData hbd= (HeartbeatData)pairs.getValue();
-                logger.info(" XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX from channel "+ch.toString()); 
-                logger.info(" XXXXXXXXXXXXXXXXXXXXxx from heartbeat data "+ hbd.getChannel().toString());
-
-			}
-
-			for (HeartbeatData hd1 : HeartbeatManager.getInstance().incomingHB.values()){
-				logger.info("---------------After----------------current channel of incoming "+ hd1.getChannel().toString());
-			}*/
-
-			logger.info( "Size of outgoingHB : " +HeartbeatManager.getInstance().outgoingHB.size()+ "HeartbeatManager.getInstance().outgoingHB.values(): "+HeartbeatManager.getInstance().outgoingHB.values());
+			//msg = generateElectionMessage();
+			if (nodeId.length()>0 && desc.length()>0 && voteAction != null){
+			LeaderElection.Builder leaderElect = LeaderElection.newBuilder().setNodeId(nodeId).setBallotId("BallotId").setDesc(desc).setVote(voteAction);
+			Management.Builder req = Management.newBuilder().setElection(leaderElect.build());
+			msg= req.build();
+			
+			logger.info( "<--Inside ElectionManager:sendElectionMsg-->Size of outgoingHB : " +HeartbeatManager.getInstance().outgoingHB.size()+ "HeartbeatManager.getInstance().outgoingHB.values(): "+HeartbeatManager.getInstance().outgoingHB.values());
 			for(HeartbeatData hb : HeartbeatManager.getInstance().outgoingHB.values())
-				//for(Channel ch : HeartbeatManager.getInstance().outgoingHB.keySet())
 			{
-				logger.info("HB data!"+hb.channel.localAddress().toString());
-				//
-				//logger.info("-------------------------------------current channel calues "+ch.localAddress().toString());
+				logger.info("<--Inside ElectionManager:sendElectionMsg-->HB data!"+hb.channel.localAddress().toString());
 				if (hb.channel.isOpen()) {
-					logger.info("Channel is open!");
+					logger.info("<--Inside ElectionManager:sendElectionMsg-->Channel is open! Value of Channel: "+hb.getChannel().toString());
 					if (hb.channel.isWritable()){
 						hb.channel.flush();
 						hb.channel.writeAndFlush(msg);
 						logger.info("Message send successfully!");
-						logger.info("Value of Channel: "+hb.getChannel().toString());
-						ManagementQueue.enqueueResponse((Management) msg, hb.channel);
+						//ManagementQueue.enqueueResponse((Management) msg, hb.channel);
 					}
 				}else{
-					logger.info("Channel not open!");
+					logger.info("<--Inside ElectionManager:sendElectionMsg-->Channel not open!");
 				}
-				logger.info("leader election message sent");
-				//return leaderElect.build();
+				logger.info("<--Inside ElectionManager:sendElectionMsg-->leader election message sent");
+			}
+			}else{
+				System.out.println("<--Inside ElectionManager:sendElectionMsg: NullPointerException-->Value of nodeId or desc or voteAction is null!");
 			}
 		} catch (Exception e) {
-			// logger.error("could not send connect to node", e);
+			logger.error("<--Inside ElectionManager:sendElectionMsg-->could not send connect to node", e);
 		}
 	}
 
@@ -249,44 +255,6 @@ public class ElectionManager {
 		b.setElection(lead.build());
 		return b.build();
 	}
-
-	/*protected Channel connect() {
-	// Start the connection attempt.
-
-	if (channel == null) {
-		try {
-			handler = new MonitorHandler();
-			MonitorInitializer mi = new MonitorInitializer(handler, false);
-
-			Bootstrap b = new Bootstrap();
-			// @TODO newFixedThreadPool(2);
-			b.group(group).channel(NioSocketChannel.class).handler(mi);
-			b.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000);
-			b.option(ChannelOption.TCP_NODELAY, true);
-			b.option(ChannelOption.SO_KEEPALIVE, true);
-
-			// Make the connection attempt.
-			channel = b.connect(host, port).syncUninterruptibly();
-			channel.awaitUninterruptibly(5000l);
-			channel.channel().closeFuture().addListener(new MonitorClosedListener(this));
-
-			if (N == Integer.MAX_VALUE)
-				N = 1;
-			else
-				N++;
-
-			// add listeners waiting to be added
-			if (listeners.size() > 0) {
-				for (MonitorListener ml : listeners)
-					handler.addListener(ml);
-				listeners.clear();
-			}
-		} catch (Exception ex) {
-			logger.debug("failed to initialize the heartbeat connection");
-			// logger.error("failed to initialize the heartbeat connection",
-			// ex);
-		}
-	}*/
 
 	//End New Code Sweny Date:03/10/2014
 }

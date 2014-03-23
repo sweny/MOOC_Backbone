@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import poke.server.Server;
 import poke.server.conf.ServerConf;
 import poke.server.conf.ServerConf.NearestConf;
 import poke.server.management.ManagementQueue;
@@ -62,12 +63,14 @@ public class HeartbeatManager extends Thread {
 	ConcurrentHashMap<Channel, HeartbeatData> outgoingHB = new ConcurrentHashMap<Channel, HeartbeatData>();
 	ConcurrentHashMap<String, HeartbeatData> incomingHB = new ConcurrentHashMap<String, HeartbeatData>();
 
-	//Sweny
+	//Start New Code By Sweny Date: 03/12/2014
 	protected ElectionManager electionMgr;
-	protected ServerConf conf;
+	String myId;
 	boolean flag =true;
 	int count = 0;
-	//Sweny
+	int votes = 1;
+	String desc;
+	//End New Code By Sweny Date: 03/12/2014
 
 
 	public static HeartbeatManager getInstance(String id) {
@@ -140,6 +143,10 @@ public class HeartbeatManager extends Thread {
 		} else {
 			logger.error("Received a HB connection unknown to the server, node ID = ", nodeId);
 			// TODO actions?
+			//Start New Code By Sweny Date: 03/12/2014
+			
+			//End New Code By Sweny Date: 03/12/2014
+			
 		}
 	}
 
@@ -209,30 +216,28 @@ public class HeartbeatManager extends Thread {
 	@Override
 	public void run() {
 		logger.info("starting HB manager");
-		//Start New Code Sweny 
+		
+		//Start New Code to keep the track of HB and send first automatic message after the first 4 HB send -By Sweny Date: 03/12/2014
+		if(flag){			
 
-		if(flag){
-			
-			/*Sweny */logger.info("Test -1 votes inside flag in HBManager : ");
-			int votes = 1;
-			electionMgr = ElectionManager.getInstance(nodeId, votes);
+			myId = Server.myId;
+			electionMgr = ElectionManager.getInstance(myId, votes);
 			flag = false;
+			logger.info("<--Inside HearbeatManager:run()--> myId : "+myId);
 		}
-		//End New Code Sweny
+		//End New Code -By Sweny Date: 03/12/2014
+		
 		while (forever) {
 			try {
 				Thread.sleep(sHeartRate);
 
 				// ignore until we have edges with other nodes
 				if (outgoingHB.size() > 0) {
-					// TODO verify known node's status
+					// TODO verify known node's status  -- Sweny ??? Need to work on this ! to check whether node connected to node is alive or dead and handle accordingly!
 
 					// send my status (heartbeatMgr)
 					GeneratedMessage msg = null;
-					//Start New Code Sweny 
 
-
-					//End New Code Sweny
 					for (HeartbeatData hd : outgoingHB.values()) {
 						// if failed sends exceed threshold, stop sending
 						if (hd.getFailuresOnSend() > HeartbeatData.sFailureToSendThresholdDefault)
@@ -244,18 +249,19 @@ public class HeartbeatManager extends Thread {
 
 						try {
 							logger.info("sending heartbeat to : "+hd.getNodeId());
-							logger.info("Size of outgoingHB 1: "+outgoingHB.size());
+							
+							logger.info("<--Inside HearbeatManager:run()-->Size of outgoingHB 1: "+outgoingHB.size());
 							hd.channel.writeAndFlush(msg);
-							//Start New Code Sweny 
+							//Start New Code to send the fist ElectionStart message after first 4 HB send - By Sweny Date: 03/22/2014
 							count++;
-							if (count==4){
-								logger.info("--in startManagers--Server.java--> Sending the first Election Message containing nodeId as: "+nodeId);
-								electionMgr.sendElectionMsg(nodeId, VoteAction.ELECTION);
-								logger.info("--in startManagers--Server.java--> First Election Message Sent from HeartbeatManager!");
+							if (count==4 && !HeartbeatListener.gotFirstElectMesg){
+								logger.info("<--Inside HearbeatManager:run()-->Sending the first Election Message containing nodeId as myId: "+myId);
+								desc = "Starting Election, message recieved from "+myId;
+								electionMgr.sendElectionMsg(myId, desc, VoteAction.ELECTION);
+								//Server.callElectionSendMsg();
+								logger.info("<--Inside HearbeatManager:run()-->First Election Message Sent from HeartbeatManager!");
 							}
-
-							//End New Code Sweny
-							logger.info("Size of outgoingHB 2: "+outgoingHB.size());
+							//End New Code to send the fist ElectionStart message after first 4 HB send - By Sweny Date: 03/22/2014
 							hd.setLastBeatSent(System.currentTimeMillis());
 							hd.setFailuresOnSend(0);
 							if (logger.isDebugEnabled())

@@ -58,9 +58,8 @@ public class OutboundMgmtWorker extends Thread {
 						cf.awaitUninterruptibly();
 						rtn = cf.isSuccess();
 						if (!rtn){
-							logger.info("msg msg.req.getElection() before" + msg.req.getElection());
+							logger.info("msg msg.req.getElection() before" + msg.req.getElection()); //Sweny
 							ManagementQueue.outbound.putFirst(msg);
-							logger.info("msg msg.req.getElection() after" + msg.req.getElection());
 							
 					}}
 

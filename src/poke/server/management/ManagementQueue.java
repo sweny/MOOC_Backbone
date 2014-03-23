@@ -65,7 +65,7 @@ public class ManagementQueue {
 			ManagementQueueEntry entry = new ManagementQueueEntry(req, ch, sa);
 			inbound.put(entry);
 			//Sweny
-			logger.info("<--Inside ManagementQueue enqReq--> Message put inside outbound Queue entry.req.getElection():" + entry.req.getElection());
+			logger.info("<--Inside ManagementQueue enqReq--> Message put inside inbound Queue entry.req.getElection():" + entry.req.getElection());
 			//Sweny
 		} catch (InterruptedException e) {
 			logger.error("message not enqueued for processing", e);

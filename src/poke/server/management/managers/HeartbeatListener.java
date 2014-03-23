@@ -18,13 +18,16 @@ package poke.server.management.managers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import eye.Comm.LeaderElection.VoteAction;
 import poke.monitor.MonitorListener;
 
 public class HeartbeatListener implements MonitorListener {
 	protected static Logger logger = LoggerFactory.getLogger("management");
 
 	private HeartbeatData data;
-
+	//Start New Code Sweny Date: 03/23/2014
+	public static boolean gotFirstElectMesg = false;
+	//End New Code Sweny Date: 03/23/2014
 	public HeartbeatListener(HeartbeatData data) {
 		this.data = data;
 	}
@@ -58,12 +61,14 @@ public class HeartbeatListener implements MonitorListener {
 		} else if (msg.hasBeat() && msg.getBeat().getNodeId().equals(data.getNodeId())) {
 			logger.info("Received HB response from " + msg.getBeat().getNodeId());
 			data.setLastBeat(System.currentTimeMillis());
-		} else if(msg.hasElection()){ 
-			logger.info("In Heartbeat Listener hasElection-----------------------------------------------!");
-			logger.info("Got the election Message --> Forwarding it to processRequest");
+		} //Start New Code to handle the message received for Election -by Sweny Date: 03/23/2014 
+		else if(msg.hasElection()){ 
+			logger.info("<--In Heartbeat Listener hasElection-->Got the election Message --> desc: "+msg.getElection().getDesc());
+			if (msg.getElection().getVote().equals(VoteAction.ELECTION)){
+				gotFirstElectMesg = true;
+			}
 			ElectionManager.getInstance().processRequest(msg.getElection());
-			logger.info("Got the election Message --> Message sent to processRequest");
-		}
+		}//End New Code by Sweny Date: 03/23/2014 
 		else
 			logger.error("Received heartbeatMgr from on wrong channel or unknown host: " + msg.getBeat().getNodeId());
 	}

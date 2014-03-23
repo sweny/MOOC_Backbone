@@ -37,6 +37,7 @@ import eye.Comm.LeaderElection;
 import eye.Comm.LeaderElection.Builder;
 import eye.Comm.LeaderElection.VoteAction;
 import eye.Comm.LeaderElectionOrBuilder;
+import eye.Comm.Management;
 import poke.server.conf.JsonUtil;
 import poke.server.conf.NodeDesc;
 import poke.server.conf.ServerConf;
@@ -67,13 +68,18 @@ public class Server {
 
 	protected static ChannelGroup allChannels;
 	protected static HashMap<Integer, ServerBootstrap> bootstrap = new HashMap<Integer, ServerBootstrap>();
+
+
 	protected ServerConf conf;
 
 	protected JobManager jobMgr;
 	protected NetworkManager networkMgr;
 	protected HeartbeatManager heartbeatMgr;
+	
 	protected ElectionManager electionMgr;
-
+	//Start New Code -By Sweny Date: 03/23/2014
+	public static String myId;
+	//End New Code -By Sweny Date:03/23/2014
 	/**
 	 * static because we need to get a handle to the factory from the shutdown
 	 * resource
@@ -165,6 +171,9 @@ public class Server {
 				// Start the server.
 				logger.info("Starting server " + conf.getServer().getProperty("node.id") + ", listening on port = "
 						+ port);
+				//Start New Code -By Sweny Date: 03/23/2014
+				final String myId = conf.getServer().getProperty("node.id");
+				//End New Code -By Sweny Date: 03/23/2014
 				ChannelFuture f = b.bind(port).syncUninterruptibly();
 
 				// should use a future channel listener to do this step
@@ -211,7 +220,8 @@ public class Server {
 			try {
 				String str = conf.getServer().getProperty("port.mgmt");
 				int mport = Integer.parseInt(str);
-
+				//Start new code Sweny
+				myId = conf.getServer().getProperty("node.id");
 				ServerBootstrap b = new ServerBootstrap();
 				bootstrap.put(mport, b);
 
@@ -259,32 +269,23 @@ public class Server {
 
 		// start the inbound and outbound manager worker threads
 		ManagementQueue.startup();
-		String myId = conf.getServer().getProperty("node.id");
-
+		//Start New Code Sweny Date: 03/23/2014
+		myId = conf.getServer().getProperty("node.id");
+		//End New Code Sweny Date: 03/23/2014
 		// create manager for network changes
 		networkMgr = NetworkManager.getInstance(myId);
 
 		// create manager for leader election
 		String str = conf.getServer().getProperty("node.votes");
-		/*Sweny */logger.info("Test -1 str : "+str);
 		int votes = 1;
 		if (str != null)
 			votes = Integer.parseInt(str);
 		electionMgr = ElectionManager.getInstance(myId, votes); // id = nodeid, votes
-
-		//Start new code Sweny Date: 03/08/2014
-		/*Builder bldr = LeaderElection.getDefaultInstance().newBuilder();
-		bldr.setNodeId(myId);
-		bldr.setBallotId(null);
-		bldr.setDesc(null);
-		bldr.setVote(eye.Comm.LeaderElection.VoteAction.valueOf(votes));
-		electionMgr.processRequest(bldr);*/
-		
-		//End new code Sweny Date: 03/08/2014
-		
+		//Start New Code Sweny Date: 03/23/2014
+		logger.info("My id from Server.java : "+myId);		
+		//End New Code Sweny Date: 03/23/2014
 		// create manager for accepting jobs
 		jobMgr = JobManager.getInstance(myId); // May need to update jobmanager - Sweny
-		logger.info("Test -2 electionMgr : "+electionMgr);
 		// establish nearest nodes and start receiving heartbeats
 		heartbeatMgr = HeartbeatManager.getInstance(myId);
 		for (NodeDesc nn : conf.getNearest().getNearestNodes().values()) {
@@ -292,7 +293,6 @@ public class Server {
 			logger.info("Heartbeat getPort "+nn.getPort());
 			HeartbeatConnector.getInstance().addConnectToThisNode(node);
 		}
-		logger.info("Test -3 heartbeatMgr : "+heartbeatMgr);
 		heartbeatMgr.start();
 
 		// manage heartbeatMgr connections
@@ -301,14 +301,7 @@ public class Server {
 		conn.start();
 
 		logger.info("Server " + myId + ", managers initialized");
-		
-/*		//Start New Code Sweny Date: 03/19/2014
-		//conn.run();
-		logger.info("--in startManagers--Server.java--> Sending the first Election Message");
-		 electionMgr.sendElectionMsg(myId, VoteAction.ELECTION);
-		  logger.info("--in startManagers--Server.java--> First Election Message Sent!");
-		//End New Code Sweny Date: 03/19/2014
-*/	}
+	}
 
 	/**
 	 * 
@@ -323,17 +316,17 @@ public class Server {
 		logger.info("Initializing server " + myId);
 
 		// storage initialization
-		// TODO storage setup (e.g., connection to a database)
+		// TODO storage setup (e.g./ connection to a database)
 
 		startManagers(); // Here it starts network, election and heartbeat manager
-		
+
 		StartManagement mgt = new StartManagement(conf);
 		Thread mthread = new Thread(mgt);
 		mthread.start();
 
 		StartCommunication comm = new StartCommunication(conf);
 		logger.info("Server " + myId + " ready");
-		
+
 		Thread cthread = new Thread(comm);
 		cthread.start();
 		/*boolean flag  = true;
@@ -342,7 +335,7 @@ public class Server {
 		electionMgr.sendElectionMsg(myId, VoteAction.ELECTION);
 		flag = false;
 		}*/
-		
+
 	}
 
 	/**
@@ -357,12 +350,12 @@ public class Server {
 		File cfg = new File(args[0]);
 		if (!cfg.exists()) {
 			Server.logger.error("configuration file does not exist: " + cfg);
-			System.exit(2);
-		}
+			System.exit(2);		}
 
 		Server svr = new Server(cfg);
 		svr.run();
-		
-		
+
+
 	}
+
 }

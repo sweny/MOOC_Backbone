@@ -192,8 +192,7 @@ public class HeartMonitor {
 		boolean rtn = false;
 		try {
 			Channel ch = connect();
-//Sweny
-			logger.info("-------------------sending mgmt join message  and channel is : "+ch.toString());
+			logger.info("sending mgmt join message  and channel is : "+ch.toString());
 			Network.Builder n = Network.newBuilder();
 			n.setNodeId("mgmt-" + whoami + "." + N);
 			n.setAction(NetworkAction.NODEJOIN);
